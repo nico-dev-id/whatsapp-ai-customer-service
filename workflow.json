@@ -1,0 +1,700 @@
+{
+  "name": "AI Customer Services Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-in",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -768,
+        -80
+      ],
+      "id": "19c39530-fa44-443a-bbc9-ff14786c6935",
+      "name": "Webhook",
+      "webhookId": "0f587be6-c818-4c10-b38b-85e3ed2bdfa6"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  model: \"llama-3.3-70b-versatile\",\n  messages: [\n    {\n      role: \"user\",\n      content: \"Kamu adalah asisten customer service untuk toko \\\"Kaosku Custom\\\". Berikut informasi resmi toko yang HARUS jadi acuan:\\n\\n\" + $json.knowledge_base + \"\\n\\nTugas kamu: klasifikasikan pesan customer ke SALAH SATU kategori:\\n- FAQ: jika pertanyaan BISA dijawab akurat menggunakan informasi toko di atas\\n- LEAD: jika customer menunjukkan minat pesan/beli\\n- LAINNYA: jika di luar topik ATAU informasinya TIDAK ADA di data toko (jangan mengarang jawaban)\\n\\nPesan pelanggan: \\\"\" + $json.body.payload.body + \"\\\"\\n\\nBalas HANYA dengan format:\\nKategori: [FAQ/LEAD/LAINNYA]\\nJawaban: [jika FAQ, jawab akurat sesuai data. Jika LEAD, tanya detail pesanan (produk, ukuran, jumlah, desain). Jika LAINNYA, kosongkan]\"\n    }\n  ]\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -352,
+        -80
+      ],
+      "id": "e2fa3025-1927-4cd8-9532-daa4eb52cb24",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "ArxsonJW1RXY0GYt",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.choices[0].message.content }}",
+                    "rightValue": "FAQ",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    },
+                    "id": "b5f973e9-2dde-4747-890a-00aa4ce8a225"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "00213349-2fa8-45bd-96df-4d95fbd9eb85",
+                    "leftValue": "={{ $json.choices[0].message.content }}",
+                    "rightValue": "LEAD",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "839f98a9-ed81-4134-aeb3-633ed6f62099",
+                    "leftValue": "={{ $json.choices[0].message.content }}",
+                    "rightValue": "LAINNYA",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -144,
+        -80
+      ],
+      "id": "a696b143-5bc2-44bd-808a-46d27dc54e54",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/sendText",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $('Webhook').item.json.body.payload._data.key.remoteJidAlt.split('@')[0] + '@c.us' }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.choices[0].message.content.split('Jawaban:')[1]?.trim() || \"Terima kasih atas pesan Anda.\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        64,
+        -208
+      ],
+      "id": "080d3bfc-d304-4ccf-b28a-1c1d70f4ca0b",
+      "name": "HTTP Request1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4y4l9REFzuW3HMpX",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/sendText",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $('Webhook').item.json.body.payload._data.key.remoteJidAlt.split('@')[0] + '@c.us' }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.choices[0].message.content.split('Jawaban:')[1]?.trim() || \"Terima kasih atas pesan Anda.\" }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        64,
+        -64
+      ],
+      "id": "1c04af23-8989-4f97-a7c9-d61431a1725c",
+      "name": "HTTP Request2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4y4l9REFzuW3HMpX",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:3000/api/sendText",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "session",
+              "value": "default"
+            },
+            {
+              "name": "chatId",
+              "value": "6287892062545@c.us"
+            },
+            {
+              "name": "text",
+              "value": "={{ \"Pesan customer perlu respon manual dari: \" + $('Webhook').item.json.body.payload._data.pushName + \"\\nIsi pesan: \" + $('Webhook').item.json.body.payload.body }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        64,
+        80
+      ],
+      "id": "f9fde5dd-4aca-4be6-906c-c499c0d5f3bb",
+      "name": "HTTP Request3",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "4y4l9REFzuW3HMpX",
+          "name": "Header Auth account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "10d7c13c-2784-4abc-844b-20c2c02d3e34",
+              "name": "knowledge_base",
+              "value": "INFORMASI TOKO \"KAOSKU CUSTOM\":\n\nJam operasional: Senin-Sabtu, 09.00-18.00 WIB (Minggu tutup)\n\nProduk & Harga:\n- Kaos custom sablon: Rp 85.000/pcs\n- Kaos custom bordir: Rp 120.000/pcs\n- Hoodie custom sablon: Rp 150.000/pcs\n- Hoodie custom bordir: Rp 195.000/pcs\n- Minimal order: 1 pcs (custom personal), diskon 10% untuk order 12+ pcs\n\nEstimasi produksi: 3-5 hari kerja (belum termasuk pengiriman)\n\nMetode pembayaran: Transfer BCA/BNI/Mandiri, QRIS, COD (khusus area Pekanbaru)\n\nPengiriman: JNE, J&T, SiCepat (ongkir sesuai kota tujuan, dihitung otomatis saat checkout)\n\nKebijakan retur: Barang cacat produksi bisa ditukar maksimal 3 hari setelah diterima, dengan bukti foto/video unboxing\n\nCara pesan: Kirim desain (JPG/PNG) atau request desain custom, tentukan ukuran (S/M/L/XL/XXL) dan jumlah, tim akan kirim mockup untuk approval sebelum produksi",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -560,
+        -80
+      ],
+      "id": "2a44ff23-0523-4008-b4fa-6b015bc40f5d",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1ZmRmttlLF8s1hWcauoarlvK-Dm3pn76Bc2H3X5FWKXU",
+          "mode": "list",
+          "cachedResultName": "WhatsApp Bot - Lead Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZmRmttlLF8s1hWcauoarlvK-Dm3pn76Bc2H3X5FWKXU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZmRmttlLF8s1hWcauoarlvK-Dm3pn76Bc2H3X5FWKXU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Tanggal": "={{ $now }}",
+            "Nomor WA": "={{ $('Webhook').item.json.body.payload._data.key.remoteJidAlt.split('@')[0] }}",
+            "Pesan Awal": "={{ $('Webhook').item.json.body.payload.body }}",
+            "Nama": "={{ $('Webhook').item.json.body.payload._data.pushName }}",
+            "Kategori": "={{ $('HTTP Request').item.json.choices[0].message.content.match(/Kategori:\\s*(\\w+)/)?.[1] || 'N/A' }}",
+            "Jawaban AI": "={{ $('HTTP Request').item.json.choices[0].message.content.split('Jawaban:')[1]?.trim() || '-' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Tanggal",
+              "displayName": "Tanggal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nama",
+              "displayName": "Nama",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nomor WA",
+              "displayName": "Nomor WA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Pesan Awal",
+              "displayName": "Pesan Awal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Kategori",
+              "displayName": "Kategori",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Jawaban AI",
+              "displayName": "Jawaban AI",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        272,
+        -208
+      ],
+      "id": "5703a0c6-c9a4-41c5-8c01-8fd1a4101c31",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3Od1wNpkO6TDKtHE",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1ZmRmttlLF8s1hWcauoarlvK-Dm3pn76Bc2H3X5FWKXU",
+          "mode": "list",
+          "cachedResultName": "WhatsApp Bot - Lead Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZmRmttlLF8s1hWcauoarlvK-Dm3pn76Bc2H3X5FWKXU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZmRmttlLF8s1hWcauoarlvK-Dm3pn76Bc2H3X5FWKXU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Tanggal": "={{ $now }}",
+            "Nomor WA": "={{ $('Webhook').item.json.body.payload._data.key.remoteJidAlt.split('@')[0] }}",
+            "Pesan Awal": "={{ $('Webhook').item.json.body.payload.body }}",
+            "Nama": "={{ $('Webhook').item.json.body.payload._data.pushName }}",
+            "Kategori": "={{ $('HTTP Request').item.json.choices[0].message.content.match(/Kategori:\\s*(\\w+)/)?.[1] || 'N/A' }}",
+            "Jawaban AI": "={{ $('HTTP Request').item.json.choices[0].message.content.split('Jawaban:')[1]?.trim() || '-' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Tanggal",
+              "displayName": "Tanggal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nama",
+              "displayName": "Nama",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nomor WA",
+              "displayName": "Nomor WA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Pesan Awal",
+              "displayName": "Pesan Awal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Kategori",
+              "displayName": "Kategori",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Jawaban AI",
+              "displayName": "Jawaban AI",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        272,
+        -64
+      ],
+      "id": "98fe35b1-5081-47e2-ab1c-10daa7b72e23",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3Od1wNpkO6TDKtHE",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1ZmRmttlLF8s1hWcauoarlvK-Dm3pn76Bc2H3X5FWKXU",
+          "mode": "list",
+          "cachedResultName": "WhatsApp Bot - Lead Log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZmRmttlLF8s1hWcauoarlvK-Dm3pn76Bc2H3X5FWKXU/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1ZmRmttlLF8s1hWcauoarlvK-Dm3pn76Bc2H3X5FWKXU/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Tanggal": "={{ $now }}",
+            "Nomor WA": "={{ $('Webhook').item.json.body.payload._data.key.remoteJidAlt.split('@')[0] }}",
+            "Pesan Awal": "={{ $('Webhook').item.json.body.payload.body }}",
+            "Nama": "={{ $('Webhook').item.json.body.payload._data.pushName }}",
+            "Kategori": "={{ $('HTTP Request').item.json.choices[0].message.content.match(/Kategori:\\s*(\\w+)/)?.[1] || 'N/A' }}",
+            "Jawaban AI": "={{ $('HTTP Request').item.json.choices[0].message.content.split('Jawaban:')[1]?.trim() || '-' }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Tanggal",
+              "displayName": "Tanggal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nama",
+              "displayName": "Nama",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Nomor WA",
+              "displayName": "Nomor WA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Pesan Awal",
+              "displayName": "Pesan Awal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Kategori",
+              "displayName": "Kategori",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Jawaban AI",
+              "displayName": "Jawaban AI",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        272,
+        80
+      ],
+      "id": "ccc8d001-7122-40f4-b6e1-e7086c4ad9e6",
+      "name": "Append row in sheet2",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "3Od1wNpkO6TDKtHE",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request3": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a8419b74-0291-46b7-be50-3fab77cad9dc",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cbd85ebaa40ea62408707b02e1753aa757f8f1a326033090572329812a6573d9"
+  },
+  "nodeGroups": [],
+  "id": "GWaFSEwXFlU518aT",
+  "tags": []
+}
